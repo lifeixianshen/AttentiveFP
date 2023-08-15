@@ -26,48 +26,47 @@ def atom_features(atom,
                   use_chirality=True):
     if bool_id_feat:
         return np.array([atom_to_id(atom)])
-    else:
-        results = one_of_k_encoding_unk(
-          atom.GetSymbol(),
-          [
-            'B',
-            'C',
-            'N',
-            'O',
-            'F',
-            'Si',
-            'P',
-            'S',
-            'Cl',
-            'As',
-            'Se',
-            'Br',
-            'Te',
-            'I',
-            'At',
-            'other'
-          ]) + one_of_k_encoding(atom.GetDegree(),
-                                 [0, 1, 2, 3, 4, 5]) + \
-                  [atom.GetFormalCharge(), atom.GetNumRadicalElectrons()] + \
-                  one_of_k_encoding_unk(atom.GetHybridization(), [
-                    Chem.rdchem.HybridizationType.SP, Chem.rdchem.HybridizationType.SP2,
-                    Chem.rdchem.HybridizationType.SP3, Chem.rdchem.HybridizationType.
-                                        SP3D, Chem.rdchem.HybridizationType.SP3D2,'other'
-                  ]) + [0] # [atom.GetIsAromatic()] # set all aromaticity feature blank.
-        # In case of explicit hydrogen(QM8, QM9), avoid calling `GetTotalNumHs`
-        if not explicit_H:
-            results = results + one_of_k_encoding_unk(atom.GetTotalNumHs(),
-                                                      [0, 1, 2, 3, 4])
-        if use_chirality:
-            try:
-                results = results + one_of_k_encoding_unk(
-                    atom.GetProp('_CIPCode'),
-                    ['R', 'S']) + [atom.HasProp('_ChiralityPossible')]
-            except:
-                results = results + [False, False
-                                     ] + [atom.HasProp('_ChiralityPossible')]
+    results = one_of_k_encoding_unk(
+      atom.GetSymbol(),
+      [
+        'B',
+        'C',
+        'N',
+        'O',
+        'F',
+        'Si',
+        'P',
+        'S',
+        'Cl',
+        'As',
+        'Se',
+        'Br',
+        'Te',
+        'I',
+        'At',
+        'other'
+      ]) + one_of_k_encoding(atom.GetDegree(),
+                             [0, 1, 2, 3, 4, 5]) + \
+              [atom.GetFormalCharge(), atom.GetNumRadicalElectrons()] + \
+              one_of_k_encoding_unk(atom.GetHybridization(), [
+                Chem.rdchem.HybridizationType.SP, Chem.rdchem.HybridizationType.SP2,
+                Chem.rdchem.HybridizationType.SP3, Chem.rdchem.HybridizationType.
+                                    SP3D, Chem.rdchem.HybridizationType.SP3D2,'other'
+              ]) + [0] # [atom.GetIsAromatic()] # set all aromaticity feature blank.
+    # In case of explicit hydrogen(QM8, QM9), avoid calling `GetTotalNumHs`
+    if not explicit_H:
+        results = results + one_of_k_encoding_unk(atom.GetTotalNumHs(),
+                                                  [0, 1, 2, 3, 4])
+    if use_chirality:
+        try:
+            results = results + one_of_k_encoding_unk(
+                atom.GetProp('_CIPCode'),
+                ['R', 'S']) + [atom.HasProp('_ChiralityPossible')]
+        except:
+            results = results + [False, False
+                                 ] + [atom.HasProp('_ChiralityPossible')]
 
-        return np.array(results)
+    return np.array(results)
 
 
 def bond_features(bond, use_chirality=True):
@@ -79,9 +78,10 @@ def bond_features(bond, use_chirality=True):
         bond.IsInRing()
     ]
     if use_chirality:
-        bond_feats = bond_feats + one_of_k_encoding_unk(
+        bond_feats += one_of_k_encoding_unk(
             str(bond.GetStereo()),
-            ["STEREONONE", "STEREOANY", "STEREOZ", "STEREOE"])
+            ["STEREONONE", "STEREOANY", "STEREOZ", "STEREOE"],
+        )
     return np.zeros(shape=np.array(bond_feats).shape) # set all bond features blank
 
 

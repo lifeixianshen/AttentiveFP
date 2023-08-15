@@ -90,10 +90,9 @@ class memoize(object):
     def __call__(self, *args):
         if args in self.cache:
             return self.cache[args]
-        else:
-            result = self.func(*args)
-            self.cache[args] = result
-            return result
+        result = self.func(*args)
+        self.cache[args] = result
+        return result
 
     def __get__(self, obj, objtype):
         return partial(self.__call__, obj)
@@ -164,7 +163,7 @@ def gen_descriptor_data(smilesList):
 
     smiles_to_fingerprint_array = {}
 
-    for i,smiles in enumerate(smilesList):
+    for smiles in smilesList:
 #         if i > 5:
 #             print("Due to the limited computational resource, submission with more than 5 molecules will not be processed")
 #             break
@@ -175,7 +174,7 @@ def gen_descriptor_data(smilesList):
             arrayrep = array_rep_from_smiles(molgraph)
 
             smiles_to_fingerprint_array[smiles] = arrayrep
-            
+
         except:
             print(smiles)
             time.sleep(3)
@@ -225,7 +224,7 @@ def get_smiles_dicts(smilesList):
 
     degrees = [0,1,2,3,4,5]
     #then run through our numpy array again
-    for smiles,arrayrep in smiles_to_fingerprint_features.items():
+    for smiles, arrayrep in smiles_to_fingerprint_features.items():
         mask = np.zeros((max_atom_len))
 
         #get the basic info of what
@@ -261,13 +260,13 @@ def get_smiles_dicts(smilesList):
 
             if len(atom_neighbors_list) > 0:
 
-                for i,degree_array in enumerate(atom_neighbors_list):
+                for degree_array in atom_neighbors_list:
                     for j,value in enumerate(degree_array):
                         atom_neighbors[atom_neighbor_count,j] = value
                     atom_neighbor_count += 1
 
             if len(bond_neighbors_list) > 0:
-                for i,degree_array in enumerate(bond_neighbors_list):
+                for degree_array in bond_neighbors_list:
                     for j,value in enumerate(degree_array):
                         bond_neighbors[bond_neighbor_count,j] = value
                     bond_neighbor_count += 1
@@ -278,22 +277,19 @@ def get_smiles_dicts(smilesList):
 
         smiles_to_atom_neighbors[smiles] = atom_neighbors
         smiles_to_bond_neighbors[smiles] = bond_neighbors
-        
+
         smiles_to_atom_mask[smiles] = mask
 
     del smiles_to_fingerprint_features
     feature_dicts = {}
-#     feature_dicts['smiles_to_atom_mask'] = smiles_to_atom_mask
-#     feature_dicts['smiles_to_atom_info']= smiles_to_atom_info
-    feature_dicts = {
+    return {
         'smiles_to_atom_mask': smiles_to_atom_mask,
         'smiles_to_atom_info': smiles_to_atom_info,
         'smiles_to_bond_info': smiles_to_bond_info,
         'smiles_to_atom_neighbors': smiles_to_atom_neighbors,
         'smiles_to_bond_neighbors': smiles_to_bond_neighbors,
-        'smiles_to_rdkit_list': smiles_to_rdkit_list
+        'smiles_to_rdkit_list': smiles_to_rdkit_list,
     }
-    return feature_dicts
 def save_smiles_dicts(smilesList,filename):
     #first need to get the max atom length
     max_atom_len = 0
@@ -372,13 +368,13 @@ def save_smiles_dicts(smilesList,filename):
 
             if len(atom_neighbors_list) > 0:
 
-                for i,degree_array in enumerate(atom_neighbors_list):
+                for degree_array in atom_neighbors_list:
                     for j,value in enumerate(degree_array):
                         atom_neighbors[atom_neighbor_count,j] = value
                     atom_neighbor_count += 1
 
             if len(bond_neighbors_list) > 0:
-                for i,degree_array in enumerate(bond_neighbors_list):
+                for degree_array in bond_neighbors_list:
                     for j,value in enumerate(degree_array):
                         bond_neighbors[bond_neighbor_count,j] = value
                     bond_neighbor_count += 1
@@ -389,7 +385,7 @@ def save_smiles_dicts(smilesList,filename):
 
         smiles_to_atom_neighbors[smiles] = atom_neighbors
         smiles_to_bond_neighbors[smiles] = bond_neighbors
-        
+
         smiles_to_atom_mask[smiles] = mask
 
     del smiles_to_fingerprint_features
@@ -404,8 +400,8 @@ def save_smiles_dicts(smilesList,filename):
         'smiles_to_bond_neighbors': smiles_to_bond_neighbors,
         'smiles_to_rdkit_list': smiles_to_rdkit_list
     }
-    pickle.dump(feature_dicts,open(filename+'.pickle',"wb"))
-    print('feature dicts file saved as '+ filename+'.pickle')
+    pickle.dump(feature_dicts, open(f'{filename}.pickle', "wb"))
+    print(f'feature dicts file saved as {filename}.pickle')
     return feature_dicts
 
 def get_smiles_array(smilesList, feature_dicts):
@@ -454,7 +450,7 @@ def moltosvg_highlight(smiles, atom_list, atom_predictions, molecule_prediction,
     # min_pred = np.amin(all_atom_predictions)
     # min_pred = min(filter(lambda x:x>0,all_atom_predictions))
     # max_pred = np.amax(all_atom_predictions)
-    note = 'y_pred: '+ str(molecule_prediction)
+    note = f'y_pred: {str(molecule_prediction)}'
 
     norm = matplotlib.colors.Normalize(vmin=np.exp(0.068),vmax=np.exp(max_pred))
     cmap = cm.get_cmap('gray_r')
@@ -495,7 +491,13 @@ def moltosvg_highlight_known(smiles, atom_list, atom_predictions, molecule_predi
     # min_pred = np.amin(all_atom_predictions)
     # min_pred = min(filter(lambda x:x>0,all_atom_predictions))
     # max_pred = np.amax(all_atom_predictions)
-    note = '('+ str(Number) +') y-y\' : '+ str(round(molecule_experiment,2)) + '-' + str(round(molecule_prediction,2))
+    note = (
+        f'({str(Number)}'
+        + ') y-y\' : '
+        + str(round(molecule_experiment, 2))
+        + '-'
+        + str(round(molecule_prediction, 2))
+    )
 
     norm = matplotlib.colors.Normalize(vmin=0.01*5,vmax=max_pred*6)
     cmap = cm.get_cmap('gray_r')
@@ -531,27 +533,39 @@ def weighted_highlight_known(smiles, atom_list, atom_predictions, molecule_predi
         molSize=(128,128)):
     
     mol = Chem.MolFromSmiles(smiles)
-    note = '('+ str(Number) +') y-y\' : '+ str(round(molecule_experiment,2)) + '-' + str(round(molecule_prediction,2))
+    note = (
+        f'({str(Number)}'
+        + ') y-y\' : '
+        + str(round(molecule_experiment, 2))
+        + '-'
+        + str(round(molecule_prediction, 2))
+    )
 
     contribs = [atom_predictions[m] for m in np.argsort(atom_list)]
     fig = SimilarityMaps.GetSimilarityMapFromWeights(mol, contribs, colorMap='bwr', contourLines=5, size=molSize)
     fig.axes[0].set_title(note)
     sio = StringIO()
     fig.savefig(sio, format="svg", bbox_inches='tight')
-    svg = sio.getvalue()   
-    return svg
+    return sio.getvalue()
 
 def moltosvg_interaction_known(mol, atom_list, atom_predictions, molecule_prediction, molecule_experiment, max_atom_pred, min_atom_pred, Number):
     
-    note = '('+ str(Number) +') y-y\' : '+ str(round(molecule_experiment,2)) + '-' + str(round(molecule_prediction,2))
+    note = (
+        f'({str(Number)}'
+        + ') y-y\' : '
+        + str(round(molecule_experiment, 2))
+        + '-'
+        + str(round(molecule_prediction, 2))
+    )
     norm = matplotlib.colors.Normalize(vmin=min_atom_pred*0.9,vmax=max_atom_pred*1.1)
     cmap = cm.get_cmap('gray_r')
 
     plt_colors = cm.ScalarMappable(norm=norm,cmap=cmap)
 
-    atom_colors = {}
-    for i,atom in enumerate(atom_list):
-        atom_colors[atom] = plt_colors.to_rgba(atom_predictions[i])          
+    atom_colors = {
+        atom: plt_colors.to_rgba(atom_predictions[i])
+        for i, atom in enumerate(atom_list)
+    }
     rdDepictor.Compute2DCoords(mol)
 
     drawer = rdMolDraw2D.MolDraw2DSVG(280,218)

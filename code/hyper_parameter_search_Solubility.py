@@ -46,7 +46,8 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib
 from IPython.display import SVG, display
-import seaborn as sns; sns.set(color_codes=True)
+import seaborn as sns
+sns.set(color_codes=True)
 
 
 task_name = 'solubility'
@@ -70,7 +71,6 @@ for smiles in smilesList:
         canonical_smiles_list.append(Chem.MolToSmiles(Chem.MolFromSmiles(smiles), isomericSmiles=True))
     except:
         print(smiles)
-        pass
 print("number of successfully processed smiles: ", len(remained_smiles))
 smiles_tasks_df = smiles_tasks_df[smiles_tasks_df["smiles"].isin(remained_smiles)]
 # print(smiles_tasks_df)
@@ -130,17 +130,17 @@ def train(model, dataset, optimizer, loss_function, epoch):
     batch_list = []
     for i in range(0, dataset.shape[0], batch_size):
         batch = valList[i:i+batch_size]
-        batch_list.append(batch)   
-    for counter, batch in enumerate(batch_list):
+        batch_list.append(batch)
+    for batch in batch_list:
         batch_df = dataset.loc[batch,:]
         smiles_list = batch_df.cano_smiles.values
         y_val = batch_df[tasks[0]].values
-        
+
         x_atom, x_bonds, x_atom_index, x_bond_index, x_mask, smiles_to_rdkit_list = get_smiles_array(smiles_list,feature_dicts)
         atoms_prediction, mol_prediction = model(torch.Tensor(x_atom),torch.Tensor(x_bonds),torch.cuda.LongTensor(x_atom_index),torch.cuda.LongTensor(x_bond_index),torch.Tensor(x_mask))
-        
+
         optimizer.zero_grad()
-        loss = loss_function(mol_prediction, torch.Tensor(y_val).view(-1,1))     
+        loss = loss_function(mol_prediction, torch.Tensor(y_val).view(-1,1))
         loss.backward()
         optimizer.step()
 def eval(model, dataset):
@@ -151,19 +151,19 @@ def eval(model, dataset):
     batch_list = []
     for i in range(0, dataset.shape[0], batch_size):
         batch = valList[i:i+batch_size]
-        batch_list.append(batch) 
-    for counter, batch in enumerate(batch_list):
+        batch_list.append(batch)
+    for batch in batch_list:
         batch_df = dataset.loc[batch,:]
         smiles_list = batch_df.cano_smiles.values
 #         print(batch_df)
         y_val = batch_df[tasks[0]].values
-        
+
         x_atom, x_bonds, x_atom_index, x_bond_index, x_mask, smiles_to_rdkit_list = get_smiles_array(smiles_list,feature_dicts)
         atoms_prediction, mol_prediction = model(torch.Tensor(x_atom),torch.Tensor(x_bonds),torch.cuda.LongTensor(x_atom_index),torch.cuda.LongTensor(x_bond_index),torch.Tensor(x_mask))
-        MAE = F.l1_loss(mol_prediction, torch.Tensor(y_val).view(-1,1), reduction='none')        
+        MAE = F.l1_loss(mol_prediction, torch.Tensor(y_val).view(-1,1), reduction='none')
         MSE = F.mse_loss(mol_prediction, torch.Tensor(y_val).view(-1,1), reduction='none')
 #         print(x_mask[:2],atoms_prediction.shape, mol_prediction,MSE)
-        
+
         eval_MAE_list.extend(MAE.data.squeeze().cpu().numpy())
         eval_MSE_list.extend(MSE.data.squeeze().cpu().numpy())
     return np.array(eval_MAE_list).mean(), np.array(eval_MSE_list).mean()
@@ -181,12 +181,13 @@ def f(radius, T, fingerprint_dim, weight_decay, learning_rate, p_dropout, direct
         int(round(fingerprint_dim)), output_units_num, p_dropout)
     model.cuda()
     optimizer = optim.Adam(model.parameters(), 10**-learning_rate, weight_decay=10**-weight_decay)
-    
-    best_param ={}
-    best_param["train_epoch"] = 0
-    best_param["test_epoch"] = 0
-    best_param["train_MSE"] = 9e8
-    best_param["test_MSE"] = 9e8
+
+    best_param = {
+        "train_epoch": 0,
+        "test_epoch": 0,
+        "train_MSE": 900000000.0,
+        "test_MSE": 900000000.0,
+    }
     for epoch in range(800):
         train(model, train_df, optimizer, loss_function, epoch+1)
         train_MAE, train_MSE = eval(model, train_df)
@@ -204,12 +205,9 @@ def f(radius, T, fingerprint_dim, weight_decay, learning_rate, p_dropout, direct
         f.write(','.join([str(int(round(radius))), str(int(round(T))), str(int(round(fingerprint_dim))),str(p_dropout), str(weight_decay), str(learning_rate)]))
         f.write(','+str(best_param["test_epoch"])+','+str(best_param["test_MSE"])+'\n')
 
- 
+
     # GPGO maximize performance by default, set performance to its negative value for minimization
-    if direction:
-        return best_param["test_MSE"]
-    else:
-        return -best_param["test_MSE"]
+    return best_param["test_MSE"] if direction else -best_param["test_MSE"]
 
 
 from pyGPGO.covfunc import matern32

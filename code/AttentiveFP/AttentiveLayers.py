@@ -6,14 +6,20 @@ import torch.optim as optim
 class Fingerprint(nn.Module):
 
     def __init__(self, radius, T, input_feature_dim, input_bond_dim,\
-            fingerprint_dim, output_units_num, p_dropout):
+                fingerprint_dim, output_units_num, p_dropout):
         super(Fingerprint, self).__init__()
         # graph attention for atom embedding
         self.atom_fc = nn.Linear(input_feature_dim, fingerprint_dim)
         self.neighbor_fc = nn.Linear(input_feature_dim+input_bond_dim, fingerprint_dim)
-        self.GRUCell = nn.ModuleList([nn.GRUCell(fingerprint_dim, fingerprint_dim) for r in range(radius)])
-        self.align = nn.ModuleList([nn.Linear(2*fingerprint_dim,1) for r in range(radius)])
-        self.attend = nn.ModuleList([nn.Linear(fingerprint_dim, fingerprint_dim) for r in range(radius)])
+        self.GRUCell = nn.ModuleList(
+            [nn.GRUCell(fingerprint_dim, fingerprint_dim) for _ in range(radius)]
+        )
+        self.align = nn.ModuleList(
+            [nn.Linear(2 * fingerprint_dim, 1) for _ in range(radius)]
+        )
+        self.attend = nn.ModuleList(
+            [nn.Linear(fingerprint_dim, fingerprint_dim) for _ in range(radius)]
+        )
         # graph attention for molecule embedding
         self.mol_GRUCell = nn.GRUCell(fingerprint_dim, fingerprint_dim)
         self.mol_align = nn.Linear(2*fingerprint_dim,1)
@@ -22,7 +28,7 @@ class Fingerprint(nn.Module):
 #         self.mol_GRUCell = nn.ModuleList([nn.GRUCell(fingerprint_dim, fingerprint_dim) for t in range(T)])
 #         self.mol_align = nn.ModuleList([nn.Linear(2*fingerprint_dim,1) for t in range(T)])
 #         self.mol_attend = nn.ModuleList([nn.Linear(fingerprint_dim, fingerprint_dim) for t in range(T)])
-        
+
         self.dropout = nn.Dropout(p=p_dropout)
         self.output = nn.Linear(fingerprint_dim, output_units_num)
 
@@ -57,7 +63,7 @@ class Fingerprint(nn.Module):
         batch_size, mol_length, max_neighbor_num, fingerprint_dim = neighbor_feature.shape
         atom_feature_expand = atom_feature.unsqueeze(-2).expand(batch_size, mol_length, max_neighbor_num, fingerprint_dim)
         feature_align = torch.cat([atom_feature_expand, neighbor_feature],dim=-1)
-        
+
         align_score = F.leaky_relu(self.align[0](self.dropout(feature_align)))
 #             print(attention_weight)
         align_score = align_score + softmax_mask
@@ -81,7 +87,7 @@ class Fingerprint(nn.Module):
         for d in range(self.radius-1):
             # bonds_indexed = [bond_list[i][torch.cuda.LongTensor(bond_degree_list)[i]] for i in range(batch_size)]
             neighbor_feature = [activated_features[i][atom_degree_list[i]] for i in range(batch_size)]
-            
+
             # neighbor_feature is a list of 3D tensor, so we need to stack them into a 4D tensor first
             neighbor_feature = torch.stack(neighbor_feature, dim=0)
             atom_feature_expand = activated_features.unsqueeze(-2).expand(batch_size, mol_length, max_neighbor_num, fingerprint_dim)
@@ -104,22 +110,21 @@ class Fingerprint(nn.Module):
 #             atom_feature_reshape = atom_feature.view(batch_size*mol_length, fingerprint_dim)
             atom_feature_reshape = self.GRUCell[d+1](context_reshape, atom_feature_reshape)
             atom_feature = atom_feature_reshape.view(batch_size, mol_length, fingerprint_dim)
-            
+
             # do nonlinearity
             activated_features = F.relu(atom_feature)
 
         mol_feature = torch.sum(activated_features * atom_mask, dim=-2)
-        
+
         # do nonlinearity
         activated_features_mol = F.relu(mol_feature)           
-        
+
         mol_softmax_mask = atom_mask.clone()
         mol_softmax_mask[mol_softmax_mask == 0] = -9e8
         mol_softmax_mask[mol_softmax_mask == 1] = 0
         mol_softmax_mask = mol_softmax_mask.type(torch.cuda.FloatTensor)
-        
-        for t in range(self.T):
-            
+
+        for _ in range(self.T):
             mol_prediction_expand = activated_features_mol.unsqueeze(-2).expand(batch_size, mol_length, fingerprint_dim)
             mol_align = torch.cat([mol_prediction_expand, activated_features], dim=-1)
             mol_align_score = F.leaky_relu(self.mol_align(mol_align))
@@ -137,7 +142,7 @@ class Fingerprint(nn.Module):
 
             # do nonlinearity
             activated_features_mol = F.relu(mol_feature)           
-            
+
         mol_prediction = self.output(self.dropout(mol_feature))
-            
+
         return atom_feature, mol_prediction
